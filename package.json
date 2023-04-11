@@ -15,7 +15,6 @@
   },
   "homepage": "https://github.com/jellyfish-dev/browser-media-utils#readme",
   "keywords": [
-    "webrtc",
     "membrane",
     "jellyfish"
   ],
@@ -24,16 +23,13 @@
     "url": "git://github.com/jellyfish-dev/browser-media-utils.git"
   },
   "exports": {
-    ".": "./dist/index.js",
-    "./navigator": "./dist/navigator/index.js",
-    "./jellyfish": "./dist/jellyfish/index.js",
-    "./externalState": "./dist/externalState/index.js"
+    ".": "./dist/index.js"
   },
   "typesVersions": {
     "*": {
       ".": [
         "./dist/index.d.ts"
-      ],
+      ]
     }
   },
   "scripts": {
@@ -59,5 +55,5 @@
     "typescript": "^4.9.5"
   },
   "dependencies": {
-  },
+  }
 }
