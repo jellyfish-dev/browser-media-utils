@@ -1,0 +1,63 @@
+{
+  "name": "@jellyfish-dev/browser-media-utils",
+  "version": "0.0.1",
+  "description": "Facilitates the use of getUserMedia and enumerateDevices.",
+  "license": "Apache-2.0",
+  "author": "Membrane Team",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "bugs": {
+    "url": "https://github.com/jellyfish-dev/browser-media-utils/issues"
+  },
+  "homepage": "https://github.com/jellyfish-dev/browser-media-utils#readme",
+  "keywords": [
+    "webrtc",
+    "membrane",
+    "jellyfish"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/jellyfish-dev/browser-media-utils.git"
+  },
+  "exports": {
+    ".": "./dist/index.js",
+    "./navigator": "./dist/navigator/index.js",
+    "./jellyfish": "./dist/jellyfish/index.js",
+    "./externalState": "./dist/externalState/index.js"
+  },
+  "typesVersions": {
+    "*": {
+      ".": [
+        "./dist/index.d.ts"
+      ],
+    }
+  },
+  "scripts": {
+    "build": "rimraf dist && tsc",
+    "docs": "typedoc src src/navigator src/externalState src/jellyfish",
+    "format": "prettier --write . --ignore-path ./.eslintignore",
+    "format:check": "prettier --check . --ignore-path ./.eslintignore",
+    "lint": "eslint . --ext .ts,.tsx",
+    "prepare": "rimraf dist && tsc"
+  },
+  "devDependencies": {
+    "@types/react": "^18.0.28",
+    "@typescript-eslint/eslint-plugin": "^5.57.0",
+    "eslint": "^8.36.0",
+    "eslint-config-prettier": "^8.6.0",
+    "eslint-plugin-prettier": "^4.2.1",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "prettier": "^2.8.4",
+    "react": "^18.2.0",
+    "rimraf": "^4.1.2",
+    "typedoc": "^0.23.28",
+    "typedoc-plugin-mdn-links": "^3.0.3",
+    "typescript": "^4.9.5"
+  },
+  "dependencies": {
+  },
+}
