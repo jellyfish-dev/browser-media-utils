@@ -15,7 +15,6 @@
   },
   "homepage": "https://github.com/jellyfish-dev/browser-media-utils#readme",
   "keywords": [
-    "webrtc",
     "membrane",
     "jellyfish"
   ],
@@ -24,21 +23,18 @@
     "url": "git://github.com/jellyfish-dev/browser-media-utils.git"
   },
   "exports": {
-    ".": "./dist/index.js",
-    "./navigator": "./dist/navigator/index.js",
-    "./jellyfish": "./dist/jellyfish/index.js",
-    "./externalState": "./dist/externalState/index.js"
+    ".": "./dist/index.js"
   },
   "typesVersions": {
     "*": {
       ".": [
         "./dist/index.d.ts"
-      ],
+      ]
     }
   },
   "scripts": {
     "build": "rimraf dist && tsc",
-    "docs": "typedoc src src/navigator src/externalState src/jellyfish",
+    "docs": "typedoc src",
     "format": "prettier --write . --ignore-path ./.eslintignore",
     "format:check": "prettier --check . --ignore-path ./.eslintignore",
     "lint": "eslint . --ext .ts,.tsx",
@@ -58,6 +54,5 @@
     "typedoc-plugin-mdn-links": "^3.0.3",
     "typescript": "^4.9.5"
   },
-  "dependencies": {
-  },
+  "dependencies": {}
 }
