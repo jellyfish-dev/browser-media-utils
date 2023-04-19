@@ -25,14 +25,27 @@ export const toMediaTrackConstraints = (
   return constraint;
 };
 
+export const getName = (obj: unknown): string | null =>
+  obj && typeof obj === "object" && "name" in obj && typeof obj.name === "string" ? obj["name"] : null;
+
 export const prepareReturn = (
   isInterested: boolean,
   mediaDeviceInfo: MediaDeviceInfo[],
-  permissionError: string | null
+  permissionError: string | null,
+  selectedDeviceSettings: MediaTrackSettings | null
 ): DeviceReturnType => {
   if (!isInterested) return { type: "Not requested" };
   if (permissionError) return { type: "Error", name: permissionError };
-  return { type: "OK", devices: mediaDeviceInfo.filter(isGranted) };
+  return { type: "OK", devices: mediaDeviceInfo.filter(isGranted), selectedDeviceSettings };
+};
+
+export const getRequestedDeviceSettings = (
+  detailedSettings: Array<MediaTrackSettings>,
+  deviceIds: MediaDeviceInfo[]
+): MediaTrackSettings | null => {
+  const videoDeviceIds = deviceIds.map((info) => info.deviceId);
+
+  return detailedSettings.find((settings) => settings.deviceId && videoDeviceIds.includes(settings.deviceId)) || null;
 };
 
 export const NOOP = () => {};

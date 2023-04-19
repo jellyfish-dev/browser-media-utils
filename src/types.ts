@@ -1,5 +1,5 @@
 export type DeviceReturnType =
-  | { type: "OK"; devices: MediaDeviceInfo[] }
+  | { type: "OK"; devices: MediaDeviceInfo[]; selectedDeviceSettings: MediaTrackSettings | null }
   | { type: "Error"; name: string | null }
   | { type: "Not requested" };
 

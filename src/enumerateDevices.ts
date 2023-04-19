@@ -1,4 +1,12 @@
-import { isAudio, isNotGranted, isVideo, prepareReturn, toMediaTrackConstraints } from "./utils";
+import {
+  getName,
+  getRequestedDeviceSettings,
+  isAudio,
+  isNotGranted,
+  isVideo,
+  prepareReturn,
+  toMediaTrackConstraints,
+} from "./utils";
 import { EnumerateDevices } from "./types";
 
 /**
@@ -38,6 +46,8 @@ export const enumerateDevices = async (
   let audioError: string | null = null;
   let videoError: string | null = null;
 
+  const detailedSettings: Array<MediaTrackSettings> = [];
+
   try {
     if (constraints.audio || constraints.video) {
       const requestedDevices = await navigator.mediaDevices.getUserMedia(constraints);
@@ -45,17 +55,35 @@ export const enumerateDevices = async (
       mediaDeviceInfos = await navigator.mediaDevices.enumerateDevices();
 
       requestedDevices.getTracks().forEach((track) => {
+        const settings = track.getSettings();
+        if (settings.deviceId) {
+          detailedSettings.push(settings);
+        }
         track.stop();
       });
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     // https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices/getUserMedia#exceptions
-    videoError = booleanVideo && videoNotGranted ? error.name : null;
-    audioError = booleanAudio && audioNotGranted ? error.name : null;
+    const errorName = getName(error);
+    videoError = booleanVideo && videoNotGranted ? errorName : null;
+    audioError = booleanAudio && audioNotGranted ? errorName : null;
   }
 
+  const videoDevices = mediaDeviceInfos.filter(isVideo);
+  const audioDevices = mediaDeviceInfos.filter(isAudio);
+
   return {
-    video: prepareReturn(booleanVideo, mediaDeviceInfos.filter(isVideo), videoError),
-    audio: prepareReturn(booleanAudio, mediaDeviceInfos.filter(isAudio), audioError),
+    video: prepareReturn(
+      booleanVideo,
+      videoDevices,
+      videoError,
+      getRequestedDeviceSettings(detailedSettings, videoDevices)
+    ),
+    audio: prepareReturn(
+      booleanAudio,
+      audioDevices,
+      audioError,
+      getRequestedDeviceSettings(detailedSettings, audioDevices)
+    ),
   };
 };
