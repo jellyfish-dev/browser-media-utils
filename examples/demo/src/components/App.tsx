@@ -147,7 +147,7 @@ export const App = () => {
           const audioIdToStart = mediaDeviceInfos.find((info) => info.label === previousAudioDevice?.label)?.deviceId
 
           if (videoIdToStart || audioIdToStart) {
-            console.log("-> Wyłączam wszystko")
+            console.log("-> Znalazłem pasujące. Wyłączam wszystko")
             requestedDevices.getTracks().forEach((track) => {
               track.stop();
             });
@@ -159,6 +159,8 @@ export const App = () => {
               audio: booleanAudio && !!audioIdToStart && { ...objAudio, deviceId: { exact: audioIdToStart } },
             };
 
+            console.log("-> Ponownie pobieram urządzenia")
+            console.log({ exactConstraints })
             requestedDevices = await navigator.mediaDevices.getUserMedia(exactConstraints);
           }
 
@@ -270,28 +272,43 @@ export const App = () => {
           <h3>Algorithm result</h3>
         {mediaStream.getTracks().map((track) => {
           const settings = track.getSettings()
-          let label: string | null = null
-          let thisLabel: string | null = null
+
+          let prevVideoLabel: string | null = null
+          let thisVideoLabel: string | null = null
+
+          let prevAudioLabel: string | null = null
+          let thisAudioLabel: string | null = null
+
           if (state?.video.type === "OK") {
-            thisLabel = state.video.devices.find((device) => device.deviceId === settings?.deviceId)?.label || null
-            label = state.video.devices.find((device) => device.deviceId === previousVideoDevice?.deviceId)?.label || null
+            thisVideoLabel = state.video.devices.find((device) => device.deviceId === settings?.deviceId)?.label || null
+            prevVideoLabel = state.video.devices.find((device) => device.deviceId === previousVideoDevice?.deviceId)?.label || null
           }
 
-          console.log({
-            thisLabel, label
-          })
+          if (state?.audio.type === "OK") {
+            thisAudioLabel = state.audio.devices.find((device) => device.deviceId === settings?.deviceId)?.label || null
+            prevAudioLabel = state.audio.devices.find((device) => device.deviceId === previousAudioDevice?.deviceId)?.label || null
+          }
+
+          const isAudio = !!thisAudioLabel
+
           return (
             <div key={settings.deviceId} className="flex flex-row items-start">
-              <div className="badge badge-outline badge-success m-1">{thisLabel}</div>
+              <div className="badge badge-outline badge-success m-1">{thisVideoLabel || thisAudioLabel}</div>
               <div className="badge badge-outline badge-secondary m-1">{settings.deviceId}</div>
-              {(label === previousVideoDevice?.label || settings.deviceId === previousVideoDevice?.deviceId) &&
-                  <div className="badge badge-success">Success!</div>}
+
+              {!isAudio && (prevVideoLabel === previousVideoDevice?.label || settings.deviceId === previousVideoDevice?.deviceId) &&
+                  <div className="badge badge-success">Success!</div>
+              }
+
+              {isAudio && (prevAudioLabel === previousAudioDevice?.label || settings.deviceId === previousAudioDevice?.deviceId) &&
+                  <div className="badge badge-success">Success!</div>
+              }
             </div>
           )
         })}
       </div>}
 
-      <div>
+      <div className="flex flex-row">
         {previousVideoDevice && <div className="card bg-base-100 shadow-xl m-1">
             <div className="card-body">
                 <h3>Local Storage Video Device</h3>
@@ -390,8 +407,8 @@ export const App = () => {
                     </div>
                 </div>
                 <button className="btn m-1 btn-success" onClick={() => {
-                  setPreviousVideoDevice(null)
-                  saveObject("video", null)
+                  setPreviousAudioDevice(null)
+                  saveObject("audio", null)
                 }}>
                     Remove LS
                 </button>
@@ -421,7 +438,7 @@ export const App = () => {
           </button>
       </div>}
 
-      <div className="card bg-base-100 shadow-xl">
+      <div className="card bg-base-100 shadow-xl m-1">
         <div className="card-body">
           <div className="card-title">
             <h3>Local storage devices</h3>
