@@ -18,8 +18,31 @@ export const App = () => {
   const [mediaDeviceInfo, setMediaDeviceInfo] = useState<MediaDeviceInfo[] | null>(null)
   const [videoId, setVideoId] = useState<string>("")
   const [videoGroup, setVideoGroup] = useState<string>("")
+
   const [previousVideoDevice, setPreviousVideoDevice] = useState<MediaDeviceInfo | null>(() => loadObject("video", null))
   const [previousAudioDevice, setPreviousAudioDevice] = useState<MediaDeviceInfo | null>(() => loadObject("audio", null))
+
+  const [audioDeviceLabelInput, setAudioDeviceLabelInput] = useState<string>("")
+  const [audioDeviceIdInput, setAudioDeviceIdInput] = useState<string>("")
+
+  const [videoDeviceLabelInput, setVideoDeviceLabelInput] = useState<string>("")
+  const [videoDeviceIdInput, setVideoDeviceIdInput] = useState<string>("")
+
+  useEffect(() => {
+    const audio = loadObject<MediaDeviceInfo | null>("audio", null)
+    if (audio) {
+      setAudioDeviceIdInput(audio.deviceId)
+      setAudioDeviceLabelInput(audio.label)
+    }
+
+    const video = loadObject<MediaDeviceInfo | null>("video", null)
+    if (video) {
+      setVideoDeviceIdInput(video.deviceId)
+      setVideoDeviceLabelInput(video.label)
+    }
+  }, [])
+
+
   const [lastSelectedAudioDevice, setLastSelectedAudioDevice] = useState<MediaDeviceInfo | null>(() => loadObject("audio", null))
 
   const [state, setState] = useState<NewHook | null>(null);
@@ -269,18 +292,110 @@ export const App = () => {
       </div>}
 
       <div>
-        {previousVideoDevice && <div className="card">
-            <h3>Local Storage Video Device</h3>
-            <div className="flex flex-row items-start">
-                <div className="badge badge-outline badge-success m-1">{previousVideoDevice.label}</div>
-                <div className="badge badge-outline badge-secondary m-1">{previousVideoDevice.deviceId}</div>
+        {previousVideoDevice && <div className="card bg-base-100 shadow-xl m-1">
+            <div className="card-body">
+                <h3>Local Storage Video Device</h3>
+                <div className="flex flex-col items-start">
+                    <div className="badge badge-outline badge-success m-1">{previousVideoDevice.label}</div>
+
+                    <div className="flex flex-row">
+                        <input type="text"
+                               placeholder="Audio device label"
+                               className="input input-bordered w-full max-w-xs m-1"
+                               onChange={(e) => setVideoDeviceLabelInput(e.target.value || "")}
+                               value={videoDeviceLabelInput}/>
+                        <button className="btn m-1 btn-success" onClick={() => {
+                          const device: MediaDeviceInfo = {
+                            ...loadObject("video", {} as MediaDeviceInfo),
+                            label: videoDeviceLabelInput
+                          }
+
+                          saveObject("video", device)
+                        }}>
+                            Save to LS
+                        </button>
+                    </div>
+
+
+                    <div className="badge badge-outline badge-secondary m-1">{previousVideoDevice.deviceId}</div>
+                    <div className="flex flex-row">
+                        <input type="text"
+                               placeholder="Video device id"
+                               className="input input-bordered w-full max-w-xs m-1"
+                               onChange={(e) => setVideoDeviceIdInput(e.target.value || "")}
+                               value={videoDeviceIdInput}/>
+                        <button className="btn m-1 btn-success" onClick={() => {
+                          const device: MediaDeviceInfo = {
+                            ...loadObject("video", {} as MediaDeviceInfo),
+                            deviceId: videoDeviceIdInput
+                          }
+
+                          saveObject("video", device)
+                        }}>
+                            Save to LS
+                        </button>
+                    </div>
+                </div>
+                <button className="btn m-1 btn-success" onClick={() => {
+                  setPreviousVideoDevice(null)
+                  saveObject("video", null)
+                }}>
+                    Remove LS
+                </button>
             </div>
-            <button className="btn m-1 btn-success" onClick={() => {
-              setPreviousVideoDevice(null)
-              saveObject("video", null)
-            }}>
-                Remove LS
-            </button>
+        </div>}
+
+        {previousAudioDevice && <div className="card bg-base-100 shadow-xl m-1">
+            <div className="card-body">
+                <h3>Local Storage Audio Device</h3>
+                <div className="flex flex-col items-start">
+                    <div className="badge badge-outline badge-success m-1">{previousAudioDevice.label}</div>
+
+                    <div className="flex flex-row">
+                        <input type="text"
+                               placeholder="Audio device label"
+                               className="input input-bordered w-full max-w-xs m-1"
+                               onChange={(e) => setAudioDeviceLabelInput(e.target.value || "")}
+                               value={audioDeviceLabelInput}/>
+                        <button className="btn m-1 btn-success" onClick={() => {
+                          const device: MediaDeviceInfo = {
+                            ...loadObject("audio", {} as MediaDeviceInfo),
+                            label: audioDeviceLabelInput
+                          }
+
+                          saveObject("audio", device)
+                        }}>
+                            Save to LS
+                        </button>
+                    </div>
+
+
+                    <div className="badge badge-outline badge-secondary m-1">{previousAudioDevice.deviceId}</div>
+                    <div className="flex flex-row">
+                        <input type="text"
+                               placeholder="Audio device id"
+                               className="input input-bordered w-full max-w-xs m-1"
+                               onChange={(e) => setAudioDeviceIdInput(e.target.value || "")}
+                               value={audioDeviceIdInput}/>
+                        <button className="btn m-1 btn-success" onClick={() => {
+                          const device: MediaDeviceInfo = {
+                            ...loadObject("audio", {} as MediaDeviceInfo),
+                            deviceId: audioDeviceIdInput
+                          }
+
+                          saveObject("audio", device)
+                        }}>
+                            Save to LS
+                        </button>
+                    </div>
+                </div>
+                <button className="btn m-1 btn-success" onClick={() => {
+                  setPreviousVideoDevice(null)
+                  saveObject("video", null)
+                }}>
+                    Remove LS
+                </button>
+            </div>
         </div>}
       </div>
 
@@ -314,8 +429,17 @@ export const App = () => {
           {localStorageDevices.map((device, idx) => {
             return <div key={idx} className="flex flex-row flex-wrap items-start">
               <button className="btn m-1 btn-success" onClick={() => {
-                setPreviousVideoDevice(device)
-                saveObject("video", device)
+                if (device.kind === "videoinput") {
+                  setPreviousVideoDevice(device)
+                  saveObject("video", device)
+                  setVideoDeviceLabelInput(device.label)
+                  setVideoDeviceIdInput(device.deviceId)
+                } else {
+                  setPreviousAudioDevice(device)
+                  saveObject("audio", device)
+                  setAudioDeviceLabelInput(device.label)
+                  setAudioDeviceIdInput(device.deviceId)
+                }
               }}>
                 Save to LS
               </button>
