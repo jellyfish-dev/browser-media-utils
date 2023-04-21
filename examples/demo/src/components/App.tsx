@@ -18,7 +18,8 @@ export const App = () => {
   const [mediaDeviceInfo, setMediaDeviceInfo] = useState<MediaDeviceInfo[] | null>(null)
   const [videoId, setVideoId] = useState<string>("")
   const [videoGroup, setVideoGroup] = useState<string>("")
-  const [localStorageVideoDevice, setLocalStorageVideoDevice] = useState<MediaDeviceInfo | null>(() => loadObject("video", null))
+  const [previousVideoDevice, setPreviousVideoDevice] = useState<MediaDeviceInfo | null>(() => loadObject("video", null))
+  const [previousAudioDevice, setPreviousAudioDevice] = useState<MediaDeviceInfo | null>(() => loadObject("audio", null))
   const [lastSelectedAudioDevice, setLastSelectedAudioDevice] = useState<MediaDeviceInfo | null>(() => loadObject("audio", null))
 
   const [state, setState] = useState<NewHook | null>(null);
@@ -43,145 +44,63 @@ export const App = () => {
       video: booleanVideo ? { type: "Loading" } : { type: "Not requested" },
     }));
 
-    // const videoNotGranted = mediaDeviceInfos.filter(isVideo).some(isNotGranted);
-    // const audioNotGranted = mediaDeviceInfos.filter(isAudio).some(isNotGranted);
-
-    const constraints = {
-      video: booleanVideo && objVideo,
-      audio: booleanAudio && objAudio,
-    };
-
     let audioError: string | null = null;
     let videoError: string | null = null;
 
     const detailedSettings: Array<MediaTrackSettings> = [];
 
     setState((prevState) => ({
-      audio: constraints.audio ? { type: "Requesting" } : prevState?.audio ?? { type: "Loading" },
-      video: constraints.video ? { type: "Requesting" } : prevState?.video ?? { type: "Loading" },
+      audio: booleanVideo && objVideo ? { type: "Requesting" } : prevState?.audio ?? { type: "Loading" },
+      video: booleanAudio && objAudio ? { type: "Requesting" } : prevState?.video ?? { type: "Loading" },
     }));
 
     let requestedDevices: MediaStream | null = null
-    if (localStorageVideoDevice?.deviceId) {
+
+    if (previousVideoDevice?.deviceId || previousAudioDevice?.deviceId) {
       console.log("-> Jest device w local storage. Proszę o konkretne urządzenie")
       try {
-        // if (constraints.audio || constraints.video) {
-
-
-        // ask for every device
-        // const requestedDevices = await navigator.mediaDevices.getUserMedia(constraints);
-
-        const constraints2: MediaStreamConstraints = {
-          video: booleanVideo && { ...objVideo, deviceId: { exact: localStorageVideoDevice?.deviceId } },
-          audio: booleanAudio && objAudio,
+        const exactConstraints: MediaStreamConstraints = {
+          video: booleanVideo && { ...objVideo, deviceId: { exact: previousVideoDevice?.deviceId } },
+          audio: booleanAudio && { ...objAudio, deviceId: { exact: previousAudioDevice?.deviceId } },
         };
 
-        console.log({ constraints2 })
-        // ask for devices by ID
-        requestedDevices = await navigator.mediaDevices.getUserMedia(constraints2);
-        // }
+        console.log({ exactConstraints })
+
+        requestedDevices = await navigator.mediaDevices.getUserMedia(exactConstraints);
       } catch (error: unknown) {
-        console.warn("Nie ma tego urządzenia (stare id lub macos)")
-        // https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices/getUserMedia#exceptions
-        // const errorName = getName(error);
-        // videoError = booleanVideo ? errorName : null;
-        // audioError = booleanAudio ? errorName : null;
+        console.log("-> Nie udało się pobrać użądzenia po ID")
       }
     }
 
     try {
       if (requestedDevices === null) {
-        console.log("-> Pytam o dowolne")
-        // pytaj o jakiekolwiek
-        const constraints3: MediaStreamConstraints = {
+        console.log("-> Pobieram dowolne urządzenie")
+        const anyDeviceConstraints: MediaStreamConstraints = {
           video: booleanVideo && objVideo,
           audio: booleanAudio && objAudio,
         };
-        console.log({ constraints3 })
+        console.log({ anyDeviceConstraints })
 
-        requestedDevices = await navigator.mediaDevices.getUserMedia(constraints3);
-        console.log("Pobrało jakieś urządzenie")
-
-
-        // jeżeli to nie to co chciałem (macos) to zmień
-
-        // requestedDevices.getTracks().map((track) => {
-        //   return track.getSettings().deviceId;
-        // });
+        requestedDevices = await navigator.mediaDevices.getUserMedia(anyDeviceConstraints);
+        console.log("-> Pobrano dowolne urządzenie")
       }
     } catch (error: unknown) {
-      console.warn("Błąd pobierania.")
+      console.warn("Wystąpił błąd pobierania urządzeń")
       // https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices/getUserMedia#exceptions
-      // const errorName = getName(error);
-      // videoError = booleanVideo ? errorName : null;
-      // audioError = booleanAudio ? errorName : null;
+      const errorName = getName(error);
+      videoError = booleanVideo ? errorName : null;
+      audioError = booleanAudio ? errorName : null;
     }
 
     const mediaDeviceInfos: MediaDeviceInfo[] = await navigator.mediaDevices.enumerateDevices();
-
-    console.log({ enumeratedDevices: mediaDeviceInfos })
 
     const currentDevices: { videoinput: MediaDeviceInfo | null, audioinput: MediaDeviceInfo | null } = {
       videoinput: null,
       audioinput: null,
     }
 
-    if (requestedDevices) {
-      // // nie ma takiego urządzenia
-      // mediaDeviceInfos = await navigator.mediaDevices.enumerateDevices();
-      //
-      requestedDevices.getTracks().forEach((track) => {
-        const settings = track.getSettings();
-        console.log({ settings })
-        if (settings.deviceId) {
-          detailedSettings.push(settings);
-          const currentDevice = mediaDeviceInfos.find((device) => device.deviceId == settings.deviceId)
-          const kind = currentDevice?.kind || null
-          if (currentDevice && kind && kind === "videoinput" || kind === "audioinput") {
-            currentDevices[kind] = currentDevice || null
-          }
-        }
-        // track.stop();
-      });
-    }
-
-    if (localStorageVideoDevice && (currentDevices.videoinput?.deviceId !== localStorageVideoDevice.deviceId) || (currentDevices.videoinput?.label === localStorageVideoDevice?.label)) {
-      console.log("Coś się nie zgadza!")
-      console.log({
-        id: {
-          localStorage: localStorageVideoDevice?.deviceId,
-          current: currentDevices.videoinput?.deviceId
-        },
-        label: {
-          localStorage: localStorageVideoDevice?.label,
-          current: currentDevices.videoinput?.label
-        }
-      })
-
+    try {
       if (requestedDevices) {
-        console.log("Wyłączam wszystko")
-
-        requestedDevices.getTracks().forEach((track) => {
-          track.stop();
-        });
-
-        console.log({ _name: "Szukany label", mediaDeviceInfos, labelToFind: localStorageVideoDevice?.label })
-
-        const videoIdToStart = mediaDeviceInfos.find((info) => info.label === localStorageVideoDevice?.label)?.deviceId
-
-        console.log({ name: "Ustalam id video do wystartowania", videoIdToStart })
-        if (videoIdToStart) {
-          const constraints4: MediaStreamConstraints = {
-            video: booleanVideo && { ...objVideo, deviceId: { exact: videoIdToStart } },
-            audio: booleanAudio && objAudio,
-          };
-          console.log({ constraints4 })
-
-          requestedDevices = await navigator.mediaDevices.getUserMedia(constraints4);
-        }
-
-
-        console.log({ name: "Zapisuje kolejne detailedSettings" })
         requestedDevices.getTracks().forEach((track) => {
           const settings = track.getSettings();
           console.log({ settings })
@@ -193,15 +112,50 @@ export const App = () => {
               currentDevices[kind] = currentDevice || null
             }
           }
-          // track.stop();
         });
 
 
-        // ask for devices by ID
-      }
-    }
+        if (previousVideoDevice && (currentDevices.videoinput?.deviceId !== previousVideoDevice.deviceId) || (currentDevices.videoinput?.label === previousVideoDevice?.label)) {
+          console.log("-> Pobrane urządzenie nie odpowiada ostatnio używanemu. Szukam pasującego urządzenia po label")
+          // todo obsluzyc brak takiego urządzenia
+          // eg. Safari
 
-    console.log({ _name: "Obecne detailed currentDevices", currentDevices })
+          const videoIdToStart = mediaDeviceInfos.find((info) => info.label === previousVideoDevice?.label)?.deviceId
+          const audioIdToStart = mediaDeviceInfos.find((info) => info.label === previousAudioDevice?.label)?.deviceId
+
+          if (videoIdToStart || audioIdToStart) {
+            console.log("-> Wyłączam wszystko")
+            requestedDevices.getTracks().forEach((track) => {
+              track.stop();
+            });
+            // todo
+            //  obsluzyc sytuację gdzie jedno urządzenie zniknęło albo ma inną nazwę nie występującą obecnie
+
+            const exactConstraints: MediaStreamConstraints = {
+              video: booleanVideo && !!videoIdToStart && { ...objVideo, deviceId: { exact: videoIdToStart } },
+              audio: booleanAudio && !!audioIdToStart && { ...objAudio, deviceId: { exact: audioIdToStart } },
+            };
+
+            requestedDevices = await navigator.mediaDevices.getUserMedia(exactConstraints);
+          }
+
+          console.log("-> Nadpisuję kolejne detailedSettings")
+          requestedDevices.getTracks().forEach((track) => {
+            const settings = track.getSettings();
+            if (settings.deviceId) {
+              detailedSettings.push(settings);
+              const currentDevice = mediaDeviceInfos.find((device) => device.deviceId == settings.deviceId)
+              const kind = currentDevice?.kind || null
+              if (currentDevice && kind && kind === "videoinput" || kind === "audioinput") {
+                currentDevices[kind] = currentDevice || null
+              }
+            }
+          });
+        }
+      }
+    } catch (error: unknown) {
+      console.error("-> To sięn powinno wydarzyć")
+    }
 
     const videoDevices = mediaDeviceInfos.filter(isVideo);
     const audioDevices = mediaDeviceInfos.filter(isAudio);
@@ -221,26 +175,12 @@ export const App = () => {
       ),
     });
     setMediaStream(requestedDevices)
-  }, [localStorageVideoDevice])
+    setMediaDeviceInfo(mediaDeviceInfos)
+  }, [previousAudioDevice, previousVideoDevice])
 
   useEffect(() => {
     console.log({ state })
   }, [state])
-
-  useEffect(() => {
-    if (state?.video.type === "OK") {
-      const deviceId = state?.video.selectedDeviceSettings?.deviceId
-      const stream = state.video.devices.find((device) => device.deviceId === deviceId)
-      if (stream) {
-        // setMediaStream(stream)
-      }
-    }
-  }, [state])
-
-
-  useEffect(() => {
-    console.log({ videoId })
-  }, [videoId])
 
   return (<div className="w-full-no-scrollbar">
     <button className="btn m-1 btn-success" onClick={() => {
@@ -311,7 +251,7 @@ export const App = () => {
           let thisLabel: string | null = null
           if (state?.video.type === "OK") {
             thisLabel = state.video.devices.find((device) => device.deviceId === settings?.deviceId)?.label || null
-            label = state.video.devices.find((device) => device.deviceId === localStorageVideoDevice?.deviceId)?.label || null
+            label = state.video.devices.find((device) => device.deviceId === previousVideoDevice?.deviceId)?.label || null
           }
 
           console.log({
@@ -321,7 +261,7 @@ export const App = () => {
             <div key={settings.deviceId} className="flex flex-row items-start">
               <div className="badge badge-outline badge-success m-1">{thisLabel}</div>
               <div className="badge badge-outline badge-secondary m-1">{settings.deviceId}</div>
-              {(label === localStorageVideoDevice?.label || settings.deviceId === localStorageVideoDevice?.deviceId) &&
+              {(label === previousVideoDevice?.label || settings.deviceId === previousVideoDevice?.deviceId) &&
                   <div className="badge badge-success">Success!</div>}
             </div>
           )
@@ -329,14 +269,14 @@ export const App = () => {
       </div>}
 
       <div>
-        {localStorageVideoDevice && <div className="card">
+        {previousVideoDevice && <div className="card">
             <h3>Local Storage Video Device</h3>
             <div className="flex flex-row items-start">
-                <div className="badge badge-outline badge-success m-1">{localStorageVideoDevice.label}</div>
-                <div className="badge badge-outline badge-secondary m-1">{localStorageVideoDevice.deviceId}</div>
+                <div className="badge badge-outline badge-success m-1">{previousVideoDevice.label}</div>
+                <div className="badge badge-outline badge-secondary m-1">{previousVideoDevice.deviceId}</div>
             </div>
             <button className="btn m-1 btn-success" onClick={() => {
-              setLocalStorageVideoDevice(null)
+              setPreviousVideoDevice(null)
               saveObject("video", null)
             }}>
                 Remove LS
@@ -374,7 +314,7 @@ export const App = () => {
           {localStorageDevices.map((device, idx) => {
             return <div key={idx} className="flex flex-row flex-wrap items-start">
               <button className="btn m-1 btn-success" onClick={() => {
-                setLocalStorageVideoDevice(device)
+                setPreviousVideoDevice(device)
                 saveObject("video", device)
               }}>
                 Save to LS
