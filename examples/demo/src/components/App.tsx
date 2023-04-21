@@ -155,8 +155,8 @@ export const App = () => {
             //  obsluzyc sytuację gdzie jedno urządzenie zniknęło albo ma inną nazwę nie występującą obecnie
 
             const exactConstraints: MediaStreamConstraints = {
-              video: booleanVideo && !!videoIdToStart && { ...objVideo, deviceId: { exact: videoIdToStart } },
-              audio: booleanAudio && !!audioIdToStart && { ...objAudio, deviceId: { exact: audioIdToStart } },
+              video: booleanVideo && !!videoIdToStart ? { ...objVideo, deviceId: { exact: videoIdToStart } } : objVideo,
+              audio: booleanAudio && !!audioIdToStart ? { ...objAudio, deviceId: { exact: audioIdToStart } } : objAudio,
             };
 
             console.log("-> Ponownie pobieram urządzenia")
