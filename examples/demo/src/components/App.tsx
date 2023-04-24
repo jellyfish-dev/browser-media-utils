@@ -1,23 +1,33 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { loadObject, loadString, removeSavedItem, saveObject } from "../localStorageUtils";
-import { NewHook, useNewHook } from "./useNewHook";
+import { loadObject, removeSavedItem, saveObject } from "../localStorageUtils";
+import { DeviceReturnType, Media, NewHook } from "./useNewHook";
 import {
   getName,
   getRequestedDeviceSettings,
-  isAudio,
-  isNotGranted,
+  isAudio, isGranted,
   isVideo,
-  prepareReturn,
   toMediaTrackConstraints
 } from "./utils";
 import { AUDIO_TRACK_CONSTRAINTS, VIDEO_TRACK_CONSTRAINTS } from "../constraints";
+
+export const prepareReturn = (
+  isInterested: boolean,
+  mediaDeviceInfo: MediaDeviceInfo[],
+  permissionError: string | null,
+): DeviceReturnType => {
+  if (!isInterested) return { type: "Not requested" };
+  if (permissionError) return { type: "Error", name: permissionError };
+  return {
+    type: "OK",
+    devices: mediaDeviceInfo.filter(isGranted),
+  };
+};
 
 export const App = () => {
   const [localStorageDevices, setLocalStorageDevices] = useState(() => loadObject<MediaDeviceInfo[]>("devices", []))
   const [mediaStream, setMediaStream] = useState<MediaStream | null>(null)
   const [mediaDeviceInfo, setMediaDeviceInfo] = useState<MediaDeviceInfo[] | null>(null)
   const [videoId, setVideoId] = useState<string>("")
-  const [videoGroup, setVideoGroup] = useState<string>("")
 
   const [previousVideoDevice, setPreviousVideoDevice] = useState<MediaDeviceInfo | null>(() => loadObject("video", null))
   const [previousAudioDevice, setPreviousAudioDevice] = useState<MediaDeviceInfo | null>(() => loadObject("audio", null))
@@ -42,9 +52,6 @@ export const App = () => {
     }
   }, [])
 
-
-  const [lastSelectedAudioDevice, setLastSelectedAudioDevice] = useState<MediaDeviceInfo | null>(() => loadObject("audio", null))
-
   const [state, setState] = useState<NewHook | null>(null);
   const skip = useRef<boolean>(false);
 
@@ -65,16 +72,17 @@ export const App = () => {
     setState(() => ({
       audio: booleanAudio ? { type: "Loading" } : { type: "Not requested" },
       video: booleanVideo ? { type: "Loading" } : { type: "Not requested" },
+      audioMedia: null,
+      videoMedia: null,
     }));
-
-    let audioError: string | null = null;
-    let videoError: string | null = null;
 
     const detailedSettings: Array<MediaTrackSettings> = [];
 
     setState((prevState) => ({
       audio: booleanVideo && objVideo ? { type: "Requesting" } : prevState?.audio ?? { type: "Loading" },
       video: booleanAudio && objAudio ? { type: "Requesting" } : prevState?.video ?? { type: "Loading" },
+      audioMedia: null,
+      videoMedia: null,
     }));
 
     let requestedDevices: MediaStream | null = null
@@ -94,6 +102,9 @@ export const App = () => {
         console.log("-> Nie udało się pobrać użądzenia po ID")
       }
     }
+
+    let audioError: string | null = null;
+    let videoError: string | null = null;
 
     try {
       if (requestedDevices === null) {
@@ -137,10 +148,8 @@ export const App = () => {
           }
         });
 
-
         if (previousVideoDevice && (currentDevices.videoinput?.deviceId !== previousVideoDevice.deviceId) || (currentDevices.videoinput?.label === previousVideoDevice?.label)) {
           console.log("-> Pobrane urządzenie nie odpowiada ostatnio używanemu. Szukam pasującego urządzenia po label")
-          // todo obsluzyc brak takiego urządzenia
           // eg. Safari
 
           const videoIdToStart = mediaDeviceInfos.find((info) => info.label === previousVideoDevice?.label)?.deviceId
@@ -151,8 +160,6 @@ export const App = () => {
             requestedDevices.getTracks().forEach((track) => {
               track.stop();
             });
-            // todo
-            //  obsluzyc sytuację gdzie jedno urządzenie zniknęło albo ma inną nazwę nie występującą obecnie
 
             const exactConstraints: MediaStreamConstraints = {
               video: booleanVideo && !!videoIdToStart ? { ...objVideo, deviceId: { exact: videoIdToStart } } : objVideo,
@@ -164,18 +171,18 @@ export const App = () => {
             requestedDevices = await navigator.mediaDevices.getUserMedia(exactConstraints);
           }
 
-          console.log("-> Nadpisuję kolejne detailedSettings")
-          requestedDevices.getTracks().forEach((track) => {
-            const settings = track.getSettings();
-            if (settings.deviceId) {
-              detailedSettings.push(settings);
-              const currentDevice = mediaDeviceInfos.find((device) => device.deviceId == settings.deviceId)
-              const kind = currentDevice?.kind || null
-              if (currentDevice && kind && kind === "videoinput" || kind === "audioinput") {
-                currentDevices[kind] = currentDevice || null
-              }
-            }
-          });
+          // console.log("-> Nadpisuję kolejne detailedSettings")
+          // requestedDevices.getTracks().forEach((track) => {
+          //   const settings = track.getSettings();
+          //   if (settings.deviceId) {
+          //     detailedSettings.push(settings);
+          //     const currentDevice = mediaDeviceInfos.find((device) => device.deviceId == settings.deviceId)
+          //     const kind = currentDevice?.kind || null
+          //     if (currentDevice && kind && kind === "videoinput" || kind === "audioinput") {
+          //       currentDevices[kind] = currentDevice || null
+          //     }
+          //   }
+          // });
         }
       }
     } catch (error: unknown) {
@@ -185,23 +192,89 @@ export const App = () => {
     const videoDevices = mediaDeviceInfos.filter(isVideo);
     const audioDevices = mediaDeviceInfos.filter(isAudio);
 
+    const videoTrack = requestedDevices?.getVideoTracks()[0] || null;
+    const audioTrack = requestedDevices?.getAudioTracks()[0] || null;
+
     setState({
       video: prepareReturn(
         booleanVideo,
         videoDevices,
         videoError,
-        getRequestedDeviceSettings(detailedSettings, videoDevices)
       ),
       audio: prepareReturn(
         booleanAudio,
         audioDevices,
         audioError,
-        getRequestedDeviceSettings(detailedSettings, audioDevices)
       ),
+      audioMedia: {
+        stream: requestedDevices,
+        track: audioTrack,
+        settings: getRequestedDeviceSettings(detailedSettings, audioDevices),
+      },
+      videoMedia: {
+        stream: requestedDevices,
+        track: videoTrack,
+        settings: getRequestedDeviceSettings(detailedSettings, videoDevices),
+      }
     });
     setMediaStream(requestedDevices)
     setMediaDeviceInfo(mediaDeviceInfos)
   }, [previousAudioDevice, previousVideoDevice])
+
+  const startDevice = useCallback(async (type: "video" | "audio", deviceId: string, constraints: MediaTrackConstraints) => {
+    const name = type === "audio" ? "audioMedia" : "videoMedia"
+    // is it safe?
+    state?.[name]?.track?.stop()
+
+    const objConstraints = toMediaTrackConstraints(constraints);
+    const exactConstraints: MediaStreamConstraints = {
+      [type]: { ...objConstraints, deviceId: { exact: deviceId } }
+    };
+
+    console.log("-> Pobieram nowe urządzenie")
+    console.log({ exactConstraints })
+    const requestedDevices = await navigator.mediaDevices.getUserMedia(exactConstraints);
+
+    setState((prevState) => {
+      if (prevState === null) {
+        return null;
+      }
+      // todo add settings
+      const newMedia: { audioMedia: Media } | { videoMedia: Media } = type === "audio"
+        ? {
+          audioMedia: {
+            stream: requestedDevices,
+            track: requestedDevices.getAudioTracks()[0] || null,
+            settings: null
+          }
+        }
+        : {
+          videoMedia: {
+            stream: requestedDevices,
+            track: requestedDevices.getVideoTracks()[0] || null,
+            settings: null
+          }
+        }
+
+      return ({ ...prevState, ...newMedia })
+    })
+
+  }, [state])
+
+  const stopDevice = useCallback(async (type: "video" | "audio") => {
+    const name = type === "audio" ? "audioMedia" : "videoMedia"
+
+    setState((prevState) => {
+      if (prevState === null) {
+        return null;
+      }
+      prevState?.[name]?.track?.stop()
+
+      return ({ ...prevState, [name]: null })
+    })
+
+  }, [])
+
 
   useEffect(() => {
     console.log({ state })
@@ -255,9 +328,6 @@ export const App = () => {
         <input type="text" placeholder="DeviceId" className="input input-bordered w-full max-w-xs m-1"
                onChange={(e) => setVideoId(e.target.value || "")}
                value={videoId}/>
-        {/*<input type="text" placeholder="GroupId" className="input input-bordered w-full max-w-xs m-1"*/}
-        {/*       onChange={(e) => setVideoGroup(e.target.value || "")}*/}
-        {/*       value={videoGroup}/>*/}
         <button className="btn m-1 btn-error" onClick={() => {
           mediaStream?.getTracks().forEach((track) => {
             track.stop()
@@ -333,7 +403,6 @@ export const App = () => {
                         </button>
                     </div>
 
-
                     <div className="badge badge-outline badge-secondary m-1">{previousVideoDevice.deviceId}</div>
                     <div className="flex flex-row">
                         <input type="text"
@@ -386,7 +455,6 @@ export const App = () => {
                         </button>
                     </div>
 
-
                     <div className="badge badge-outline badge-secondary m-1">{previousAudioDevice.deviceId}</div>
                     <div className="flex flex-row">
                         <input type="text"
@@ -420,12 +488,6 @@ export const App = () => {
           <h3>Current devices</h3>
         {mediaDeviceInfo.map((device, idx) => {
           return <div key={idx} className="flex flex-row flex-wrap items-start">
-
-            {/*<button className="btn m-1 btn-warning" onClick={() => {*/}
-            {/*  setLocalStorageVideoDevice(device)*/}
-            {/*}}>*/}
-            {/*  Save to LS*/}
-            {/*</button>*/}
             <div className="badge badge-outline badge-primary m-1">{device.label}</div>
             <div className="badge badge-outline badge-secondary m-1">{device.deviceId}</div>
             <div className="badge badge-outline badge-info m-1">{device.groupId}</div>
@@ -464,6 +526,15 @@ export const App = () => {
                 className={"badge m-1 " + (device.kind === "videoinput" ? "badge-success" : "badge-primary")}>{device.label}</div>
               <div className="badge badge-secondary m-1">{device.deviceId}</div>
               <div className="badge badge-secondary badge-info m-1">{device.groupId}</div>
+              <button className="btn m-1 btn-warning" onClick={() => {
+                if (device.kind === "videoinput") {
+                  startDevice("video", device.deviceId, VIDEO_TRACK_CONSTRAINTS)
+                } else {
+                  startDevice("audio", device.deviceId, AUDIO_TRACK_CONSTRAINTS)
+                }
+              }}>
+                Run
+              </button>
             </div>
           })}
         </div>
