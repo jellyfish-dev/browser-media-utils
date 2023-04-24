@@ -11,7 +11,7 @@ export type Media = {
   track: MediaStreamTrack | null;
 };
 
-export type NewHook = {
+export type UseUserMediaState = {
   audio: DeviceReturnType | { type: "Requesting" };
   video: DeviceReturnType | { type: "Requesting" };
   audioMedia: Media | null;
@@ -32,17 +32,32 @@ export const prepareReturn = (
 };
 
 
-export type UseNewHookConfig = {
+export type UseUserMediaConfig = {
   getPreviousVideoDevice: () => MediaDeviceInfo | null,
   getPreviousAudioDevice: () => MediaDeviceInfo | null,
+  videoTrackConstraints: boolean | MediaTrackConstraints,
+  audioTrackConstraints: boolean | MediaTrackConstraints,
+  refetchOnMount: boolean,
 }
 
-export type UseNewHookReturn = {
-  data: NewHook | null,
-  start: (type: "video" | "audio", deviceId: string, constraints: MediaTrackConstraints) => void,
+export type UseUserMediaStartConfig = {
+  audioDeviceId?: string,
+  videoDeviceId?: string,
+}
+
+export type UseUserMedia = {
+  data: UseUserMediaState | null,
+  start: (config: UseUserMediaStartConfig) => void,
   stop: (type: "video" | "audio") => void,
   init: (videoParam: boolean | MediaTrackConstraints, audioParam: boolean | MediaTrackConstraints) => void,
 }
+
+const prepareMediaTrackConstraints = (deviceId: string | undefined, constraints: MediaTrackConstraints | undefined): MediaTrackConstraints | boolean => {
+  if (!deviceId) return false;
+  const exactId: Pick<MediaTrackConstraints, "deviceId"> = deviceId ? { deviceId } : {}
+  return { ...constraints, ...exactId }
+}
+
 
 /**
  * Hook that returns the list of available devices
@@ -51,22 +66,28 @@ export type UseNewHookReturn = {
  * @param audio - boolean or MediaTrackConstraints with configuration for audio device
  * @returns object containing devices or loading state
  */
-export const useNewHook = (config: UseNewHookConfig): UseNewHookReturn => {
-  const { getPreviousVideoDevice, getPreviousAudioDevice } = useMemo(
-    () => config,
-    // eslint-disable-next-line
-    [])
-
-  const [state, setState] = useState<NewHook>({
+export const useUserMedia = (
+  {
+    getPreviousVideoDevice,
+    getPreviousAudioDevice,
+    videoTrackConstraints,
+    audioTrackConstraints,
+    refetchOnMount
+  }: UseUserMediaConfig): UseUserMedia => {
+  const [state, setState] = useState<UseUserMediaState>({
     video: { type: "Not requested" },
     audio: { type: "Not requested" },
     audioMedia: null,
     videoMedia: null
   });
+
+  const audioConstraints = useMemo(() => toMediaTrackConstraints(audioTrackConstraints), [audioTrackConstraints])
+  const videoConstraints = useMemo(() => toMediaTrackConstraints(videoTrackConstraints), [videoTrackConstraints])
+
   const skip = useRef<boolean>(false);
 
   const init = useCallback(
-    async (videoParam: boolean | MediaTrackConstraints, audioParam: boolean | MediaTrackConstraints) => {
+    async () => {
       if (!navigator?.mediaDevices) throw Error("Navigator is available only in secure contexts");
       if (skip.current) return;
       skip.current = true;
@@ -74,15 +95,12 @@ export const useNewHook = (config: UseNewHookConfig): UseNewHookReturn => {
       const previousVideoDevice = getPreviousVideoDevice()
       const previousAudioDevice = getPreviousAudioDevice()
 
-      const objAudio = toMediaTrackConstraints(audioParam);
-      const objVideo = toMediaTrackConstraints(videoParam);
-
-      const booleanAudio = !!audioParam;
-      const booleanVideo = !!videoParam;
+      const booleanAudio = !!audioTrackConstraints;
+      const booleanVideo = !!videoTrackConstraints;
 
       setState((prevState) => ({
-        audio: booleanVideo && objVideo ? { type: "Requesting" } : prevState.audio ?? { type: "Not requested" },
-        video: booleanAudio && objAudio ? { type: "Requesting" } : prevState.video ?? { type: "Not requested" },
+        audio: booleanVideo && audioConstraints ? { type: "Requesting" } : prevState.audio ?? { type: "Not requested" },
+        video: booleanAudio && videoConstraints ? { type: "Requesting" } : prevState.video ?? { type: "Not requested" },
         audioMedia: null,
         videoMedia: null,
       }));
@@ -93,8 +111,14 @@ export const useNewHook = (config: UseNewHookConfig): UseNewHookReturn => {
         console.log("-> Jest device w local storage. Proszę o konkretne urządzenie");
         try {
           const exactConstraints: MediaStreamConstraints = {
-            video: booleanVideo && { ...objVideo, deviceId: { exact: previousVideoDevice?.deviceId } },
-            audio: booleanAudio && { ...objAudio, deviceId: { exact: previousAudioDevice?.deviceId } },
+            video: booleanVideo && {
+              ...videoConstraints,
+              deviceId: { exact: previousVideoDevice?.deviceId }
+            },
+            audio: booleanAudio && {
+              ...audioConstraints,
+              deviceId: { exact: previousAudioDevice?.deviceId }
+            },
           };
 
           console.log({ exactConstraints });
@@ -112,8 +136,8 @@ export const useNewHook = (config: UseNewHookConfig): UseNewHookReturn => {
         if (requestedDevices === null) {
           console.log("-> Pobieram dowolne urządzenie");
           const anyDeviceConstraints: MediaStreamConstraints = {
-            video: booleanVideo && objVideo,
-            audio: booleanAudio && objAudio,
+            video: booleanVideo && videoConstraints,
+            audio: booleanAudio && audioConstraints,
           };
           console.log({ anyDeviceConstraints });
 
@@ -169,9 +193,15 @@ export const useNewHook = (config: UseNewHookConfig): UseNewHookReturn => {
 
               const exactConstraints: MediaStreamConstraints = {
                 video:
-                  booleanVideo && !!videoIdToStart ? { ...objVideo, deviceId: { exact: videoIdToStart } } : objVideo,
+                  booleanVideo && !!videoIdToStart ? {
+                    ...videoConstraints,
+                    deviceId: { exact: videoIdToStart }
+                  } : videoConstraints,
                 audio:
-                  booleanAudio && !!audioIdToStart ? { ...objAudio, deviceId: { exact: audioIdToStart } } : objAudio,
+                  booleanAudio && !!audioIdToStart ? {
+                    ...audioConstraints,
+                    deviceId: { exact: audioIdToStart }
+                  } : audioConstraints,
               };
 
               console.log("-> Ponownie pobieram urządzenia");
@@ -203,44 +233,48 @@ export const useNewHook = (config: UseNewHookConfig): UseNewHookReturn => {
         },
       });
     },
-    [getPreviousAudioDevice, getPreviousVideoDevice]
+    [audioTrackConstraints, audioConstraints, getPreviousAudioDevice, getPreviousVideoDevice, videoTrackConstraints, videoConstraints]
   );
 
   const start = useCallback(
-    async (type: "video" | "audio", deviceId: string, constraints: MediaTrackConstraints) => {
-      const name = type === "audio" ? "audioMedia" : "videoMedia";
-      // is it safe?
-      state?.[name]?.track?.stop();
+    async ({ audioDeviceId, videoDeviceId }: UseUserMediaStartConfig) => {
+      if (audioDeviceId) {
+        state?.audioMedia?.track?.stop()
+      }
+      if (videoDeviceId) {
+        state?.videoMedia?.track?.stop()
+      }
 
-      const objConstraints = toMediaTrackConstraints(constraints);
       const exactConstraints: MediaStreamConstraints = {
-        [type]: { ...objConstraints, deviceId: { exact: deviceId } },
+        video: prepareMediaTrackConstraints(videoDeviceId, videoConstraints),
+        audio: prepareMediaTrackConstraints(audioDeviceId, audioConstraints),
       };
 
       console.log("-> Pobieram nowe urządzenie");
-      console.log({ exactConstraints });
+      // todo add try catch
       const requestedDevices = await navigator.mediaDevices.getUserMedia(exactConstraints);
 
-      setState((prevState) => {
-        const newMedia: { audioMedia: Media } | { videoMedia: Media } =
-          type === "audio"
-            ? {
-              audioMedia: {
-                stream: requestedDevices,
-                track: requestedDevices.getAudioTracks()[0] || null,
-              },
-            }
-            : {
-              videoMedia: {
-                stream: requestedDevices,
-                track: requestedDevices.getVideoTracks()[0] || null,
-              },
-            };
+      const audioMedia: Pick<UseUserMediaState, "audioMedia"> | Record<string, never> = audioDeviceId ? {
+        audioMedia: {
+          stream: requestedDevices,
+          track: requestedDevices.getAudioTracks()[0] || null,
+        },
+      } : {}
 
-        return { ...prevState, ...newMedia };
+      const videoMedia: Pick<UseUserMediaState, "videoMedia"> | Record<string, never> = videoDeviceId ? {
+        videoMedia: {
+          stream: requestedDevices,
+          track: requestedDevices.getAudioTracks()[0] || null,
+        },
+      } : {}
+
+      console.log({ audioMedia, videoMedia })
+
+      setState((prevState) => {
+        return { ...prevState, ...audioMedia, ...videoMedia };
       });
     },
-    [state]
+    [audioConstraints, state?.audioMedia?.track, state?.videoMedia?.track, videoConstraints]
   );
 
   const stop = useCallback(async (type: "video" | "audio") => {
@@ -254,8 +288,11 @@ export const useNewHook = (config: UseNewHookConfig): UseNewHookReturn => {
   }, []);
 
   useEffect(() => {
-    console.log({ state });
-  }, [state]);
+    if (refetchOnMount) {
+      init()
+    }
+    // eslint-disable-next-line
+  }, []);
 
   return useMemo(() => ({
       data: state, start, stop, init

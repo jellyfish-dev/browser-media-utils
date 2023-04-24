@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { loadObject, removeSavedItem, saveObject } from "../localStorageUtils";
-import { DeviceReturnType, useNewHook } from "./useNewHook";
+import { DeviceReturnType, useUserMedia } from "./useUserMedia";
 import { isGranted } from "./utils";
 import { AUDIO_TRACK_CONSTRAINTS, VIDEO_TRACK_CONSTRAINTS } from "../constraints";
 import VideoPlayer from "./VideoPlayer";
@@ -51,9 +51,12 @@ export const App = () => {
     }
   }, []);
 
-  const { data, stop, start, init } = useNewHook(useMemo(() => ({
+  const { data, stop, start, init } = useUserMedia(useMemo(() => ({
     getPreviousAudioDevice: () => loadObject("audio", null),
-    getPreviousVideoDevice: () => loadObject("video", null)
+    getPreviousVideoDevice: () => loadObject("video", null),
+    videoTrackConstraints: VIDEO_TRACK_CONSTRAINTS,
+    audioTrackConstraints: AUDIO_TRACK_CONSTRAINTS,
+    refetchOnMount: true,
   }), []))
 
   return (
@@ -396,9 +399,9 @@ export const App = () => {
                     className="btn m-1 btn-warning"
                     onClick={() => {
                       if (device.kind === "videoinput") {
-                        start("video", device.deviceId, VIDEO_TRACK_CONSTRAINTS);
+                        start({ videoDeviceId: device.deviceId });
                       } else {
-                        start("audio", device.deviceId, AUDIO_TRACK_CONSTRAINTS);
+                        start({ audioDeviceId: device.deviceId });
                       }
                     }}
                   >
