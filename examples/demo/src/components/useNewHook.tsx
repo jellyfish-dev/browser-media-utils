@@ -1,7 +1,7 @@
 export type Device = MediaTrackSettings & {
-  stream: MediaStream,
-  track: MediaStreamTrack,
-}
+  stream: MediaStream;
+  track: MediaStreamTrack;
+};
 
 export type DeviceReturnType =
   | { type: "OK"; devices: MediaDeviceInfo[] }
@@ -9,9 +9,9 @@ export type DeviceReturnType =
   | { type: "Not requested" };
 
 export type Media = {
-  stream: MediaStream | null,
-  track: MediaStreamTrack | null,
-  settings: MediaTrackSettings | null,
+  stream: MediaStream | null;
+  track: MediaStreamTrack | null;
+  // settings: MediaTrackSettings | null,
 };
 
 export type NewHook = {
